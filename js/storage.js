@@ -41,6 +41,15 @@ function loadCharacters() {
   if (!Array.isArray(list)) return [];
   return list.map(function (c) {
     if (!c.owner) c.owner = { id: 'legado', name: 'Não definido' };
+    if (!Array.isArray(c.abilities)) c.abilities = [];
+    if (!Array.isArray(c.items)) c.items = [];
+    if (!Array.isArray(c.trainedSkills)) c.trainedSkills = [];
+    if (!Array.isArray(c.log)) c.log = [];
+    if (!Array.isArray(c.rituais)) c.rituais = [];
+    if (!c.municao) c.municao = {};
+    if (!c.equipment) c.equipment = { weaponMain: 'desarmado', weaponOff: null, armor: 'nenhuma', accessory: null };
+    if (c.trilha == null) c.trilha = null;
+    if (c.elemento == null) c.elemento = null;
     return c;
   });
 }

@@ -43,7 +43,7 @@ function renderHome() {
         (c.photo ? '<img class="mini-avatar" src="' + esc(c.photo) + '" alt="">' : '') +
         '<div>' +
         '<strong>' + esc(c.name) + '</strong>' +
-        '<div class="meta">' + esc(ownerLabel(c)) + ' · ' + esc(cls) + ' · ' + esc(org) + ' · NEX ' + d.nex + '% · Nível ' + c.level + '</div>' +
+        '<div class="meta">' + esc(ownerLabel(c)) + ' · ' + esc(cls) + ' · ' + esc(org) + (c.elemento ? ' · Elemento ' + esc(getElemento(c.elemento).name) : '') + ' · NEX ' + d.nex + '% · Nível ' + c.level + '</div>' +
         '<div class="meta">PV ' + cap(c.pv, d.pvMax) + '/' + d.pvMax + ' · SAN ' + cap(c.san, d.sanMax) + ' · XP ' + c.xp + '</div>' +
         '</div><div class="actions" onclick="event.stopPropagation()">' +
         '<button class="btn small" onclick="exportCharacterById(\'' + c.id + '\')">JSON</button>' +
@@ -58,7 +58,20 @@ function renderHome() {
     '<li>NEX (nível): cada aumento de nível dá +5% de NEX, até 99%.</li>' +
     '<li>PV = base da classe + 10×Vigor + 5×NEX · SAN = base + 5×Vontade + 5×NEX · PE por NEX.</li>' +
     '<li>Defesa = 10 + Agilidade. Armadura reduz dano (Prevenção). Crítico dobra os dados.</li>' +
-    '<li>Tudo salvo automaticamente no navegador (LocalStorage). Dá para exportar em JSON e PDF (Imprimir).</li></ul></div>';
+    '<li>Tudo salvo automaticamente no navegador (LocalStorage). Dá para exportar em JSON e PDF (Imprimir).</li></ul>' +
+    '<details class="topic"><summary>Armas de fogo</summary>' +
+    '<ul><li>Usam <strong>Agilidade</strong> no teste e a perícia <strong>Pontaria</strong> quando treinada.</li>' +
+    '<li>Têm munição limitada: Revólver 6 · Pistola 12 · Espingarda 2 · Rifle 30 · Submetralhadora 32.</li>' +
+    '<li>Quando a munição acaba, é preciso recarregar antes de atacar de novo.</li></ul></details>' +
+    '<details class="topic"><summary>Armas brancas</summary>' +
+    '<ul><li>Usam <strong>Força</strong> no teste e a perícia <strong>Luta</strong> quando treinada.</li>' +
+    '<li>Não gastam munição e funcionam sempre.</li>' +
+    '<li>Espadas, machados, adagas e facas têm crítico 19–20; desarmado causa 1d3.</li></ul></details>' +
+    '<details class="topic"><summary>Rituais e Elementos</summary>' +
+    '<ul><li>Rituais pertencem a um <strong>Elemento</strong> (Sangue, Morte, Conhecimento, Energia ou Medo).</li>' +
+    '<li>Cada ritual tem um círculo (1º ou 2º) e custo em PE; ocultistas começam com 2 rituais de 1º círculo.</li>' +
+    '<li>Sua <strong>afinidade</strong> (elemento do personagem) deixa os rituais do mesmo elemento 1 PE mais baratos (mín. 1).</li></ul></details>' +
+    '</div>';
 
   el.innerHTML = html;
 }
@@ -101,6 +114,18 @@ function renderCreate() {
     ORIGINS.forEach(function (o) {
       html += '<div class="option-card' + (d.originId === o.id ? ' selected' : '') + '" onclick="pickOrigin(\'' + o.id + '\')">' +
         '<div class="t">' + esc(o.name) + '</div><div class="d">' + esc(o.desc) + '</div></div>';
+    });
+    html += '</div>';
+
+    html += '<h3>Elemento (afinidade)</h3>' +
+      '<p class="meta" style="color:var(--muted)">Como em Ordem Paranormal, cada agente tem uma afinidade. Rituais do seu elemento custam 1 PE a menos (mín. 1).</p>' +
+      '<div class="grid cols-2">' +
+      '<div class="option-card' + (!d.elemento ? ' selected' : '') + '" onclick="pickElemento(\'\')">' +
+      '<div class="t">Sem elemento</div><div class="d">Afinidade ainda não despertada.</div></div>';
+    ELEMENTOS.forEach(function (e) {
+      html += '<div class="option-card' + (d.elemento === e.id ? ' selected' : '') + '" onclick="pickElemento(\'' + e.id + '\')">' +
+        '<div class="t"><span class="el-dot" style="background:' + e.color + '"></span>' + esc(e.name) + '</div>' +
+        '<div class="d">Afinidade com o elemento ' + esc(e.name) + '.</div></div>';
     });
     html += '</div><div style="margin-top:10px"><button class="btn accent" onclick="nextStep()">Continuar</button></div>';
   } else if (d.step === 3) {
@@ -302,7 +327,7 @@ function renderBiblioteca() {
         }).join('') + '</div>' +
 
         '<div class="meta pc-equip">' + esc(w.name) + ' (' + w.dice + ') · ' + esc(arm.name) + ' · Def ' + d.defesa +
-        ' · Prev ' + d.prevencao + ' · ' + c.abilities.length + ' habilidades</div>' +
+        ' · Prev ' + d.prevencao + ' · ' + c.abilities.length + ' habilidades ' + elementTag(c) + '</div>' +
 
         '<div class="pc-actions" onclick="event.stopPropagation()">' +
         '<button class="btn small" onclick="openCharacter(\'' + c.id + '\')">Abrir Ficha</button>' +
@@ -350,6 +375,7 @@ function renderSheet() {
     '<span class="tags">' +
     '<span class="tag">' + esc(getClass(c.classId).name) + '</span>' +
     '<span class="tag">' + esc(getOrigin(c.originId).name) + '</span>' +
+    elementTag(c) +
     '<span class="tag gold">NEX ' + nexLabel + '%</span>' +
     '<span class="tag">Nível ' + c.level + '</span>' +
     '<span class="tag">Jogador: ' + esc(ownerLabel(c)) + '</span>' +
@@ -399,6 +425,12 @@ function resourceBox(lbl, cur, max, cls) {
     '<button class="btn small" onclick="shiftResource(\'' + lbl + '\',1)">+</button></div></div>';
 }
 
+function elementTag(c) {
+  var el = c && c.elemento ? getElemento(c.elemento) : null;
+  if (!el) return '';
+  return '<span class="tag" style="color:' + el.color + ';border-color:' + el.color + '">Elemento: ' + esc(el.name) + '</span>';
+}
+
 function xpPct(c) {
   if (c.level >= 20) return 100;
   var lo = xpToReachLevel(c.level);
@@ -408,7 +440,19 @@ function xpPct(c) {
 
 function panelAtributos() {
   var c = state.active;
-  var html = '<div class="card"><h2>Atributos</h2>' +
+  var el = c.elemento ? getElemento(c.elemento) : null;
+  var html = '<div class="card"><h2>Elemento (afinidade)</h2>' +
+    '<div class="rowline" style="flex-wrap:wrap;gap:10px">' +
+    '<select onchange="setElemento(this.value)" style="width:auto;min-width:180px">' +
+    '<option value=""' + (!c.elemento ? ' selected' : '') + '>— Sem elemento —</option>' +
+    ELEMENTOS.map(function (e) {
+      return '<option value="' + e.id + '"' + (c.elemento === e.id ? ' selected' : '') + '>' + esc(e.name) + '</option>';
+    }).join('') + '</select>' +
+    (el ? '<span class="el-dot" style="background:' + el.color + '"></span>' : '') +
+    '</div>' +
+    '<p class="meta" style="color:var(--muted)">Rituais do seu elemento custam 1 PE a menos (mín. 1).</p></div>';
+
+  html += '<div class="card"><h2>Atributos</h2>' +
     '<div class="rowline" style="margin-bottom:10px;gap:20px;flex-wrap:wrap">';
   ATTRIBUTES.forEach(function (a) {
     var v = c.attributes[a.id];

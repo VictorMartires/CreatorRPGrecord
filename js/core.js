@@ -182,6 +182,7 @@ function createEmptyCharacter() {
     notes: '',
     log: [],
     trilha: null,
+    elemento: null,
     rituais: [],
     municao: {},
     diaCriacao: new Date().toLocaleDateString('pt-BR'),

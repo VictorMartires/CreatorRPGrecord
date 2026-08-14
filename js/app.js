@@ -201,6 +201,7 @@ function newCharacter() {
     classId: 'combatente',
     trilha: null,
     rituaisInit: [],
+    elemento: null,
     attributes: { for: 1, agi: 1, int: 1, pre: 1, vig: 1, von: 1 },
     pool: 12,
     trained: [],
@@ -273,6 +274,11 @@ function prevStep() {
 
 function pickOrigin(id) {
   state.draft.originId = id;
+  renderCreate();
+}
+
+function pickElemento(id) {
+  state.draft.elemento = id || null;
   renderCreate();
 }
 
@@ -351,11 +357,13 @@ function finalizeCharacter() {
   c.rituais = d.rituaisInit.map(function (id) {
     return Object.assign({}, getRitual(id));
   });
+  c.elemento = d.elemento;
   var init = derive(c);
   c.pv = init.pvMax;
   c.san = init.sanMax;
   c.pe = init.peMax;
-  addLog(c, 'Ficha criada como ' + cls.name + ' (' + origin.name + ')' + (trilha ? ' — Trilha ' + trilha.name : '') + '.');
+  var elInfo = c.elemento ? ' — Elemento ' + getElemento(c.elemento).name : '';
+  addLog(c, 'Ficha criada como ' + cls.name + ' (' + origin.name + ')' + (trilha ? ' — Trilha ' + trilha.name : '') + elInfo + '.');
   state.characters.push(c);
   state.draft = null;
   state.active = c;
@@ -368,6 +376,12 @@ function finalizeCharacter() {
 
 function setTab(name) {
   state.ui.tab = name;
+  saveState();
+  renderSheet();
+}
+
+function setElemento(id) {
+  state.active.elemento = id || null;
   saveState();
   renderSheet();
 }
