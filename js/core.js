@@ -183,6 +183,7 @@ function createEmptyCharacter() {
     municao: {},
     diaCriacao: new Date().toLocaleDateString('pt-BR'),
     photo: '',
+    appearance: '',
     owner: (state && state.user) ? { id: state.user.id, name: state.user.name } : { id: 'local', name: 'Local' }
   };
   var a = derive(def);

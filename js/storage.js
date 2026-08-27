@@ -54,6 +54,7 @@ function loadCharacters() {
     if (!c.equipment) c.equipment = { weaponMain: 'desarmado', weaponOff: null, armor: 'nenhuma', accessory: null };
     if (c.trilha == null) c.trilha = null;
     if (c.elemento == null) c.elemento = null;
+    if (typeof c.appearance !== 'string') c.appearance = '';
     c.attributes = c.attributes || {};
     ATTRIBUTES.forEach(function (a) {
       var v = c.attributes[a.id];

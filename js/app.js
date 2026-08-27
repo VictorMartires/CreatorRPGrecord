@@ -203,8 +203,9 @@ function newCharacter() {
     rituaisInit: [],
     elemento: null,
     attributes: { for: 0, agi: 0, int: 0, pre: 0, vig: 0, von: 0 },
-    pool: 6,
+    pool: 5,
     skills: {},
+    appearance: '',
     weapon: 'pistola',
     armor: 'nenhuma'
   };
@@ -260,7 +261,6 @@ function nextStep() {
     d.name = name;
   }
   if (d.step === 3) {
-    if (!d.trilha) { toast('Escolha uma trilha para a classe.'); return; }
     if (d.classId === 'ocultista' && d.rituaisInit.length !== 2) { toast('Escolha exatamente 2 rituais iniciais.'); return; }
   }
   d.step++;
@@ -334,6 +334,8 @@ function toggleTrain(skillId) {
 
 function finalizeCharacter() {
   var d = state.draft;
+  var apEl = document.getElementById('draft-appearance');
+  if (apEl && apEl.value) d.appearance = apEl.value;
   var weaponSel = document.getElementById('draft-weapon');
   var armorSel = document.getElementById('draft-armor');
   var c = createEmptyCharacter();
@@ -354,27 +356,61 @@ function finalizeCharacter() {
   Object.keys(d.skills).forEach(function (id) { c.skills[id] = 5; });
   c.attributes[origin.attr] = Math.min(3, c.attributes[origin.attr] + 1);
   c.abilities = cls.abilities.map(function (a) { return Object.assign({}, a, { custom: false }); });
-  var trilha = getTrilha(c.classId, d.trilha);
-  if (trilha) {
-    c.trilha = trilha.id;
-    c.abilities.push(Object.assign({}, trilha.ability, { custom: false }));
-  }
   c.rituais = d.rituaisInit.map(function (id) {
     return Object.assign({}, getRitual(id));
   });
   c.elemento = d.elemento;
+  c.appearance = d.appearance || '';
   var init = derive(c);
   c.pv = init.pvMax;
   c.san = init.sanMax;
   c.pe = init.peMax;
   var elInfo = c.elemento ? ' — Elemento ' + getElemento(c.elemento).name : '';
-  addLog(c, 'Ficha criada como ' + cls.name + ' (' + origin.name + ')' + (trilha ? ' — Trilha ' + trilha.name : '') + elInfo + '.');
+  addLog(c, 'Ficha criada como ' + cls.name + ' (' + origin.name + '). Trilha será escolhida aos 10% de NEX.' + elInfo + '.');
   state.characters.push(c);
   state.draft = null;
   state.active = c;
   saveState();
   renderSheet();
   toast('Ficha "' + c.name + '" criada!');
+}
+
+function setAppearance(text) {
+  var c = state.active;
+  if (!c) return;
+  c.appearance = text;
+  saveState();
+}
+
+function openTrilhaModal() {
+  var c = state.active;
+  if (c.level < 2) { toast('A Trilha é escolhida aos 10% de NEX (Nível 2).'); return; }
+  if (c.trilha) { toast('Trilha já escolhida.'); return; }
+  var cls = getClass(c.classId);
+  var html = '<h3>Escolha sua Trilha (' + esc(cls.name) + ')</h3>' +
+    '<p class="meta" style="color:var(--muted)">Disponível aos 10% de NEX (Nível 2).</p><div class="grid cols-2">';
+  (TRILHAS[c.classId] || []).forEach(function (t) {
+    html += '<div class="option-card" onclick="chooseTrilha(\'' + t.id + '\')">' +
+      '<div class="t">' + esc(t.name) + '</div>' +
+      '<div class="d">' + esc(t.desc) + '<br><strong>' + esc(t.ability.name) + '</strong> (' + t.ability.peCost + ' PE) — ' + esc(t.ability.desc) + '</div></div>';
+  });
+  html += '</div><div class="rowline" style="margin-top:10px"><button class="btn" onclick="closeModal()">Fechar</button></div>';
+  openModal(html);
+}
+
+function chooseTrilha(id) {
+  var c = state.active;
+  if (c.level < 2) { toast('Só aos 10% de NEX.'); return; }
+  if (c.trilha) { toast('Trilha já escolhida.'); return; }
+  var t = getTrilha(c.classId, id);
+  if (!t) return;
+  c.trilha = t.id;
+  c.abilities.push(Object.assign({}, t.ability, { custom: false }));
+  addLog(c, 'Escolheu a Trilha ' + t.name + ' (' + t.ability.name + ').');
+  saveState();
+  closeModal();
+  renderSheet();
+  toast('Trilha ' + t.name + ' adquirida!');
 }
 
 /* ------------------------- Ficha ------------------------- */
@@ -552,13 +588,18 @@ function addAbility() {
   var c = state.active;
   var name = document.getElementById('abil-name').value.trim();
   if (!name) { toast('Dê um nome à habilidade.'); return; }
+  var pe = parseInt(document.getElementById('abil-pe').value, 10);
+  if (!pe || pe < 1) { toast('Poderes personalizados precisam custar PE (mín. 1) para não ficarem overpowered.'); return; }
+  var customCount = c.abilities.filter(function (a) { return a.custom; }).length;
+  if (customCount >= 6) { toast('Limite de 6 poderes personalizados por ficha.'); return; }
   c.abilities.push({
     id: uid(),
     name: name,
-    peCost: parseInt(document.getElementById('abil-pe').value, 10) || 0,
+    peCost: pe,
     desc: document.getElementById('abil-desc').value.trim(),
     custom: true
   });
+  addLog(c, 'Adicionou poder personalizado "' + name + '" (' + pe + ' PE).');
   saveState();
   renderSheet();
 }

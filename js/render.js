@@ -109,9 +109,12 @@ function renderCreate() {
       '<div><label class="btn small">' + (d.photo ? 'Trocar foto' : 'Enviar foto') +
       '<input type="file" accept="image/*" hidden onchange="readPhoto(this,\'draft\')"></label>' +
       (d.photo ? '<button class="btn small danger" style="margin-top:6px" onclick="clearDraftPhoto()">Remover</button>' : '') +
-      '<p class="meta" style="color:var(--muted);margin:6px 0 0">A imagem é reduzida automaticamente para caber no salvamento.</p>' +
-      '</div></div></div>' +
-      '<button class="btn accent" onclick="nextStep()">Continuar</button>';
+       '<p class="meta" style="color:var(--muted);margin:6px 0 0">A imagem é reduzida automaticamente para caber no salvamento.</p>' +
+       '</div></div></div>' +
+       '<div class="field" style="margin-top:10px"><label>Descrição física (opcional)</label>' +
+       '<textarea id="draft-appearance" placeholder="Aparência, idade, marca, vestimenta..." onchange="state.draft.appearance=this.value">' + esc(d.appearance || '') + '</textarea>' +
+       '<p class="meta" style="color:var(--muted)">Nem todo agente tem uma imagem; use isto para descrevê-lo.</p></div>' +
+       '<button class="btn accent" onclick="nextStep()">Continuar</button>';
   } else if (d.step === 2) {
     html += '<h3>Origem</h3><div class="grid cols-2">';
     ORIGINS.forEach(function (o) {
@@ -141,14 +144,6 @@ function renderCreate() {
     });
     html += '</div>';
 
-    html += '<h3>Trilha da classe</h3><div class="grid cols-2">';
-    (TRILHAS[d.classId] || []).forEach(function (t) {
-      html += '<div class="option-card' + (d.trilha === t.id ? ' selected' : '') + '" onclick="pickTrilha(\'' + t.id + '\')">' +
-        '<div class="t">' + esc(t.name) + '</div>' +
-        '<div class="d">' + esc(t.desc) + '<br>' + esc(t.ability.name) + ' (' + t.ability.peCost + ' PE)</div></div>';
-    });
-    html += '</div>';
-
     if (d.classId === 'ocultista') {
       var r1 = RITUAIS.filter(function (r) { return r.circulo === 1; });
       html += '<h3>Rituais iniciais (escolha 2)</h3>' +
@@ -161,10 +156,11 @@ function renderCreate() {
           '<div class="d"><span class="el-badge" style="border-color:' + el.color + ';color:' + el.color + '">' + esc(el.name) + '</span> · ' + r.circulo + 'º círculo · ' + r.pe + ' PE<br>' + esc(r.desc) + '</div></div>';
       });
       html += '</div>';
+    } else {
+      html += '<p class="meta" style="color:var(--muted)">A <strong>Trilha</strong> da classe é escolhida aos 10% de NEX (Nível 2), na própria ficha.</p>';
     }
 
-    html += '<div style="margin-top:12px"><button class="btn accent" onclick="nextStep()">Continuar</button>' +
-      (d.trilha ? '' : '<span class="tag" style="margin-left:8px">Escolha uma trilha acima</span>') + '</div>';
+    html += '<div style="margin-top:12px"><button class="btn accent" onclick="nextStep()">Continuar</button></div>';
   } else if (d.step === 4) {
     var pool = d.pool;
     html += '<h3>Atributos (0–3)</h3>' +
@@ -365,18 +361,21 @@ function renderSheet() {
     resourceBox('PE', c.pe, d.peMax, 'pe')
   ].join('');
 
+  var trilhaTag = c.trilha ? '<span class="tag">' + esc(getTrilha(c.classId, c.trilha).name) + '</span>' : '';
   var avatarHtml = '<div class="avatar-col">' +
     (c.photo ? '<img class="avatar" src="' + esc(c.photo) + '" alt="foto de ' + esc(c.name) + '">' : '<div class="avatar avatar-empty">Sem foto</div>') +
     '<div class="rowline" style="justify-content:center;margin-top:6px">' +
     '<label class="btn small">Trocar<input type="file" accept="image/*" hidden onchange="readPhoto(this,\'active\')"></label>' +
     (c.photo ? '<button class="btn small danger" onclick="clearActivePhoto()">Remover</button>' : '') +
-    '</div></div>';
+    '</div>' +
+    '<textarea class="appearance-box" placeholder="Descrição física (aparência, idade, vestimenta)..." onchange="setAppearance(this.value)">' + esc(c.appearance || '') + '</textarea></div>';
 
   header.innerHTML = '<div class="sheet-head"><div>' +
     '<h2><input id="char-name" value="' + esc(c.name) + '" maxlength="40" ' +
     'onchange="renameChar(this.value)" style="font-size:22px;font-weight:700;width:auto;min-width:220px;background:transparent;border:none;border-bottom:2px solid var(--line);color:var(--ink);padding:2px 4px">' +
     '<span class="tags">' +
     '<span class="tag">' + esc(getClass(c.classId).name) + '</span>' +
+    trilhaTag +
     '<span class="tag">' + esc(getOrigin(c.originId).name) + '</span>' +
     elementTag(c) +
     '<span class="tag gold">NEX ' + nexLabel + '%</span>' +
@@ -412,6 +411,16 @@ function renderSheet() {
   var container = document.getElementById('screen-sheet');
   container.innerHTML = '';
   container.appendChild(header);
+
+  if (c.level >= 2 && !c.trilha) {
+    var banner = document.createElement('div');
+    banner.className = 'card';
+    banner.style.borderColor = 'var(--gold)';
+    banner.innerHTML = '<strong>Trilha disponível!</strong> Em Ordem Paranormal a Trilha de classe é escolhida aos 10% de NEX (Nível 2). ' +
+      '<button class="btn accent small" onclick="openTrilhaModal()">Escolher Trilha</button>';
+    container.appendChild(banner);
+  }
+
   container.appendChild(tabsEl);
   container.appendChild(panels);
 }
@@ -686,9 +695,10 @@ function panelHabilidades() {
   html += '<div class="card" style="background:var(--bg2)"><h3>Adicionar poder personalizado</h3>' +
     '<div class="form-grid">' +
     '<div class="field"><label>Nome</label><input id="abil-name" placeholder="Ex.: Lança de Medo"></div>' +
-    '<div class="field"><label>Custo (PE)</label><input id="abil-pe" type="number" value="1" min="0" style="width:70px"></div></div>' +
+    '<div class="field"><label>Custo (PE)</label><input id="abil-pe" type="number" value="1" min="1" style="width:70px"></div></div>' +
     '<div class="field"><label>Descrição / efeito</label><textarea id="abil-desc" placeholder="Descreva o que o poder faz."></textarea></div>' +
-    '<button class="btn accent" onclick="addAbility()">Adicionar</button></div>' +
+    '<button class="btn accent" onclick="addAbility()">Adicionar</button>' +
+    '<p class="meta" style="color:var(--muted)">Todo poder personalizado precisa custar PE (mín. 1) e há limite de 6 por ficha, para evitar desequilíbrio.</p></div>' +
     '</div>';
   return html;
 }
