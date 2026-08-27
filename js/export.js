@@ -26,7 +26,7 @@ function importJSON(input) {
       }
       if (!data.id) data.id = uid();
       if (!data.owner) data.owner = state.user ? { id: state.user.id, name: state.user.name } : { id: 'local', name: 'Local' };
-      if (!data.trainedSkills) data.trainedSkills = [];
+      if (!data.skills) data.skills = {};
       if (!data.items) data.items = [];
       if (!data.abilities) data.abilities = [];
       if (!data.log) data.log = [];

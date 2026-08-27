@@ -56,14 +56,14 @@ function derive(c) {
     peMax: peMax,
     defesa: defesa,
     prevencao: armadura ? armadura.prev : 0,
-    iniciativa: 1 + c.attributes.agi
+    iniciativa: c.attributes.agi
   };
 }
 
 function skillBonus(c, skillId) {
   var skill = getSkill(skillId);
-  var trained = (c.trainedSkills || []).indexOf(skillId) >= 0;
-  return attrBonus(c, skill.attr) + (trained ? 5 : 0);
+  var level = (c.skills && c.skills[skillId]) || 0;
+  return attrBonus(c, skill.attr) + level;
 }
 
 function parseDice(expression) {
@@ -126,13 +126,9 @@ function attackMod(c, weapon) {
   var attr = weaponAttr(w);
   var mod = attrBonus(c, attr);
   var skillId = attr === 'agi' ? 'pontaria' : 'luta';
-  var trained = (c.trainedSkills || []).indexOf(skillId) >= 0;
-  if (trained) mod += 5;
-  return { mod: mod, attr: attr, skillId: skillId, trained: trained, base: attackBaseFromSkills(trained) };
-}
-
-function attackBaseFromSkills(trained) {
-  return trained ? 5 : 0;
+  var level = (c.skills && c.skills[skillId]) || 0;
+  mod += level;
+  return { mod: mod, attr: attr, skillId: skillId, trained: level > 0, base: level };
 }
 
 function rollAttack(c, weapon) {
@@ -171,8 +167,8 @@ function createEmptyCharacter() {
     originId: 'militar',
     level: 1,
     xp: 0,
-    attributes: { for: 1, agi: 1, int: 1, pre: 1, vig: 1, von: 1 },
-    trainedSkills: [],
+    attributes: { for: 0, agi: 0, int: 0, pre: 0, vig: 0, von: 0 },
+    skills: {},
     pv: 0,
     san: 0,
     pe: 0,

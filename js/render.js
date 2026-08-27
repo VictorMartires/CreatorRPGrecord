@@ -53,12 +53,12 @@ function renderHome() {
   }
 
   html += '<div class="card"><h2>Como funciona</h2>' +
-    '<p>Regras caseiras baseadas em <strong>D&amp;D 5e</strong> e <strong>Ordem Paranormal</strong>:</p>' +
-    '<ul><li>Atributos de 1 a 5 somados direto nas rolagens (d20 + atributo + perícia treinada: +5).</li>' +
-    '<li>NEX (nível): cada aumento de nível dá +5% de NEX, até 99%.</li>' +
-    '<li>PV = base da classe + 10×Vigor + 5×NEX · SAN = base + 5×Vontade + 5×NEX · PE por NEX.</li>' +
-    '<li>Defesa = 10 + Agilidade. Armadura reduz dano (Prevenção). Crítico dobra os dados.</li>' +
-    '<li>Tudo salvo automaticamente no navegador (LocalStorage). Dá para exportar em JSON e PDF (Imprimir).</li></ul>' +
+    '<p>Sistema de ficha para <strong>Ordem Paranormal</strong>:</p>' +
+    '<ul><li><strong>Atributos (0 a 3)</strong>: Força, Agilidade, Intelecto, Presença, Vigor e Vontade. Cada ponto custa XP (0→1=1, 1→2=2, 2→3=3).</li>' +
+    '<li><strong>NEX</strong>: sobe 5% por nível (até 99%). Ganha PV, SAN e PE conforme o NEX.</li>' +
+    '<li><strong>PV</strong> = base da classe + 10×Vigor + 5×NEX · <strong>SAN</strong> = base + 5×Vontade + 5×NEX · <strong>PE</strong> = base + NEX/10.</li>' +
+    '<li><strong>Testes</strong>: d20 + atributo + bônus da perícia (Treinada +5, Veterana +10, Especialista +15). Defesa = 10 + Agilidade.</li>' +
+    '<li>Arma de fogo gasta munição; arma branca não. Crítico dobra os dados. Tudo salvo no navegador (e exportável em JSON/PDF).</li></ul>' +
     '<details class="topic"><summary>Armas de fogo</summary>' +
     '<ul><li>Usam <strong>Agilidade</strong> no teste e a perícia <strong>Pontaria</strong> quando treinada.</li>' +
     '<li>Têm munição limitada: Revólver 6 · Pistola 12 · Espingarda 2 · Rifle 30 · Submetralhadora 32.</li>' +
@@ -71,6 +71,9 @@ function renderHome() {
     '<ul><li>Rituais pertencem a um <strong>Elemento</strong> (Sangue, Morte, Conhecimento, Energia ou Medo).</li>' +
     '<li>Cada ritual tem um círculo (1º ou 2º) e custo em PE; ocultistas começam com 2 rituais de 1º círculo.</li>' +
     '<li>Sua <strong>afinidade</strong> (elemento do personagem) deixa os rituais do mesmo elemento 1 PE mais baratos (mín. 1).</li></ul></details>' +
+    '<details class="topic"><summary>Dano Mental</summary>' +
+    '<ul><li>Inimigos com "Dano Mental" atacam sua SAN: d20 + ND do inimigo vs DT 10 + Vontade.</li>' +
+    '<li>Se passar, você perde Pontos de Sanidade (SAN) em vez de PV.</li></ul></details>' +
     '</div>';
 
   el.innerHTML = html;
@@ -164,7 +167,7 @@ function renderCreate() {
       (d.trilha ? '' : '<span class="tag" style="margin-left:8px">Escolha uma trilha acima</span>') + '</div>';
   } else if (d.step === 4) {
     var pool = d.pool;
-    html += '<h3>Atributos (1–5)</h3>' +
+    html += '<h3>Atributos (0–3)</h3>' +
       '<p class="points-left" id="pool-left">Pontos restantes: ' + pool + '</p>' +
       '<div class="attr-alloc">';
     ATTRIBUTES.forEach(function (a) {
@@ -181,14 +184,14 @@ function renderCreate() {
     var cls = getClass(d.classId);
     var originFree = getOrigin(d.originId).skill;
     var maxTrain = cls.trainings;
-    html += '<h3>Perícias treinadas (' + d.trained.length + '/' + maxTrain + ')</h3>' +
-      '<p class="meta" style="color:var(--muted)">Origem e classe treinam: <strong>' +
+    html += '<h3>Perícias treinadas (' + Object.keys(d.skills).length + '/' + maxTrain + ')</h3>' +
+      '<p class="meta" style="color:var(--muted)">Origem e classe treinam automaticamente: <strong>' +
       esc(getSkill(originFree).name) + ' e ' + esc(getSkill(cls.freeSkill).name) + '</strong>.</p>';
     SKILLS.forEach(function (s) {
       var auto = s.id === originFree || s.id === cls.freeSkill;
-      var sel = d.trained.indexOf(s.id) >= 0;
+      var sel = !!d.skills[s.id];
       html += '<div class="skill-row' + (auto ? ' auto' : '') + '">' +
-        '<span class="' + (auto || sel ? 'trained' : '') + '">' + esc(s.name) + ' (' + s.attr.toUpperCase() + ')' + '</span>' +
+        '<span class="' + (auto || sel ? 'trained' : '') + '">' + esc(s.name) + ' (' + s.attr.toUpperCase() + ')</span>' +
         (auto ? '<span class="dice">automática</span>' :
           '<button class="btn small" onclick="toggleTrain(\'' + s.id + '\')">' + (sel ? '✓ Treinada' : 'Treinar') + '</button>') +
         '</div>';
@@ -391,7 +394,7 @@ function renderSheet() {
     ['atributos', 'Atributos & Perícias'],
     ['combate', 'Combate'],
     ['inventario', 'Inventário'],
-    ['habilidades', 'Habilidades'],
+    ['habilidades', 'Poderes & Rituais'],
     ['notas', 'Notas']
   ];
   tabsEl.className = 'tabs no-print';
@@ -466,15 +469,19 @@ function panelAtributos() {
   html += '</div></div>';
 
   html += '<div class="card"><h2>Perícias</h2><div class="rowline" style="margin-bottom:8px;gap:20px">' +
-    '<span class="tag">Treinada = bônus +5</span>' +
+    '<span class="tag">Treinada +5 · Veterana +10 · Especialista +15</span>' +
     '<span class="tag">DT: 5 fácil · 10 média · 15 difícil · 20 muito difícil</span></div>';
   SKILLS.forEach(function (s) {
-    var trained = c.trainedSkills.indexOf(s.id) >= 0;
+    var level = c.skills[s.id] || 0;
     var bonus = skillBonus(c, s.id);
+    var trained = level > 0;
+    var nexts = { 0: 5, 5: 10, 10: 15 };
+    var costMap = { 5: 2, 10: 4, 15: 6 };
+    var canUp = (level in nexts);
     html += '<div class="skill-row">' +
-      '<span class="' + (trained ? 'trained' : '') + '">' + esc(s.name) + '</span>' +
+      '<span class="' + (trained ? 'trained' : '') + '">' + esc(s.name) + ' <em style="color:var(--muted)">(' + trainName(level) + ')</em></span>' +
       '<span class="dice">d20 ' + fmtMod(bonus) + '</span>' +
-      '<button class="btn small skill-check" onclick="toggleSkill(\'' + s.id + '\')">' + (trained ? 'Tirar' : 'Treinar') + '</button>' +
+      (canUp ? '<button class="btn small skill-check" onclick="trainSkill(\'' + s.id + '\')">Subir (' + costMap[nexts[level]] + ' XP)</button>' : (level >= 15 ? '<span class="dice">máximo</span>' : '')) +
       '<button class="btn small" onclick="rollSkill(\'' + s.id + '\')">Rolar</button></div>';
   });
   html += '</div>';
@@ -509,6 +516,8 @@ function panelCombate() {
     '<p class="meta" style="margin:8px 0 0;color:var(--muted)">' +
     'Teste: d20 ' + fmtMod(info.mod) + ' (' + info.attr.toUpperCase() + (info.trained ? ' + treino' : '') + ') · ' +
     'Dano: ' + esc(w.name) + ' ' + w.dice + ' + ' + w.attr.toUpperCase() + ' · Crítico em ' + critLabel(w) + ' (dobra dados).</p>' +
+    (w.mun ? '<p class="meta" style="color:var(--muted)">Munição: ' + ammoFor(c, w.id) + '/' + w.mun +
+      ' <button class="btn small" onclick="reloadAmmo(\'' + w.id + '\')">Recarregar</button></p>' : '') +
     '<div id="attack-result" class="roll-result"></div></div>';
 
   html += '<div class="card"><h2>Alvo</h2>' +
@@ -529,10 +538,11 @@ function panelCombate() {
       '<div class="rowline" style="margin-top:8px">' +
       '<button class="btn small" onclick="applyLastDamage()">Aplicar dano rolado</button>' +
       '<button class="btn small" onclick="enemyAttacks()">Inimigo ataca</button>' +
-      '<button class="btn small" onclick="dealDamage(-5)">−5 PV</button>' +
-      '<button class="btn small" onclick="dealDamage(-1)">−1</button>' +
-      '<button class="btn small danger" onclick="removeTarget()">Remover</button>' +
-      '<button class="btn accent small" onclick="defeatTarget()">Derrotar (+XP)</button></div>' +
+       '<button class="btn small" onclick="dealDamage(-5)">−5 PV</button>' +
+       '<button class="btn small" onclick="dealDamage(-1)">−1</button>' +
+       (target.sanDmg ? '<button class="btn small" onclick="enemyMentalAttack()">Ameaça mental</button>' : '') +
+       '<button class="btn small danger" onclick="removeTarget()">Remover</button>' +
+       '<button class="btn accent small" onclick="defeatTarget()">Derrotar (+XP)</button></div>' +
       '<div id="enemy-result" class="roll-result"></div></div>';
   }
   html += '</div>';
@@ -638,9 +648,9 @@ function equipName(id, list) {
 
 function panelHabilidades() {
   var c = state.active;
-  var html = '<div class="card"><h2>Habilidades e Rituais</h2>';
+  var html = '<div class="card"><h2>Poderes</h2>';
   if (c.abilities.length === 0) {
-    html += '<p class="meta" style="color:var(--muted)">Nenhuma habilidade. Use o formulário abaixo para adicionar.</p>';
+    html += '<p class="meta" style="color:var(--muted)">Nenhum poder. Use o formulário abaixo para adicionar.</p>';
   }
   c.abilities.forEach(function (a) {
     html += '<div class="ability"><div class="head">' +
@@ -653,11 +663,31 @@ function panelHabilidades() {
       '</div></div>';
   });
 
-  html += '<div class="card" style="background:var(--bg2)"><h3>Adicionar habilidade personalizada</h3>' +
+  html += '<div class="card"><h2>Rituais</h2>';
+  if (!c.rituais || c.rituais.length === 0) {
+    html += '<p class="meta" style="color:var(--muted)">Nenhum ritual aprendido ainda.</p>';
+  }
+  (c.rituais || []).forEach(function (r) {
+    var el = getElemento(r.elemento);
+    var cost = r.pe;
+    var discount = c.elemento && r.elemento === c.elemento;
+    if (discount) cost = Math.max(1, cost - 1);
+    html += '<div class="ability"><div class="head">' +
+      '<span class="name">' + esc(r.nome) + '</span>' +
+      '<span class="pe">' + r.pe + ' PE</span></div>' +
+      '<div class="desc">' + esc(r.desc || '') + '</div>' +
+      '<div class="rowline" style="margin-top:6px;gap:8px;flex-wrap:wrap">' +
+      '<span class="el-badge" style="border-color:' + el.color + ';color:' + el.color + '">' + esc(el.name) + '</span>' +
+      '<span class="tag">' + r.circulo + 'º círculo</span>' +
+      '<button class="btn small accent" onclick="castRitual(\'' + r.id + '\')">Conjurar (' + cost + ' PE)</button></div></div>';
+  });
+  html += '</div>';
+
+  html += '<div class="card" style="background:var(--bg2)"><h3>Adicionar poder personalizado</h3>' +
     '<div class="form-grid">' +
     '<div class="field"><label>Nome</label><input id="abil-name" placeholder="Ex.: Lança de Medo"></div>' +
     '<div class="field"><label>Custo (PE)</label><input id="abil-pe" type="number" value="1" min="0" style="width:70px"></div></div>' +
-    '<div class="field"><label>Descrição / efeito</label><textarea id="abil-desc" placeholder="Descreva o que a habilidade faz."></textarea></div>' +
+    '<div class="field"><label>Descrição / efeito</label><textarea id="abil-desc" placeholder="Descreva o que o poder faz."></textarea></div>' +
     '<button class="btn accent" onclick="addAbility()">Adicionar</button></div>' +
     '</div>';
   return html;

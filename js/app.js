@@ -202,9 +202,9 @@ function newCharacter() {
     trilha: null,
     rituaisInit: [],
     elemento: null,
-    attributes: { for: 1, agi: 1, int: 1, pre: 1, vig: 1, von: 1 },
-    pool: 12,
-    trained: [],
+    attributes: { for: 0, agi: 0, int: 0, pre: 0, vig: 0, von: 0 },
+    pool: 6,
+    skills: {},
     weapon: 'pistola',
     armor: 'nenhuma'
   };
@@ -286,7 +286,7 @@ function pickClass(id) {
   state.draft.classId = id;
   state.draft.trilha = null;
   state.draft.rituaisInit = [];
-  state.draft.trained = [];
+  state.draft.skills = {};
   renderCreate();
 }
 
@@ -310,7 +310,7 @@ function adjustAttr(attrId, delta) {
   var d = state.draft;
   var v = d.attributes[attrId];
   var nv = v + delta;
-  if (nv < 1 || nv > 5) return;
+  if (nv < 0 || nv > 3) return;
   if (delta > 0 && d.pool <= 0) { toast('Sem pontos restantes!'); return; }
   d.attributes[attrId] = nv;
   d.pool -= delta;
@@ -320,11 +320,14 @@ function adjustAttr(attrId, delta) {
 function toggleTrain(skillId) {
   var d = state.draft;
   var cls = getClass(d.classId);
-  if (d.trained.indexOf(skillId) >= 0) {
-    d.trained = d.trained.filter(function (s) { return s !== skillId; });
+  var origin = getOrigin(d.originId);
+  if (skillId === origin.skill || skillId === cls.freeSkill) return;
+  if (d.skills[skillId]) {
+    delete d.skills[skillId];
   } else {
-    if (d.trained.length >= cls.trainings) { toast('Limite de treinos da classe atingido (' + cls.trainings + ').'); return; }
-    d.trained.push(skillId);
+    var count = Object.keys(d.skills).length;
+    if (count >= cls.trainings) { toast('Limite de treinos da classe atingido (' + cls.trainings + ').'); return; }
+    d.skills[skillId] = 5;
   }
   renderCreate();
 }
@@ -344,10 +347,12 @@ function finalizeCharacter() {
   var origin = getOrigin(c.originId);
   var cls = getClass(c.classId);
   c.attributes = Object.assign({}, c.attributes, d.attributes);
-  c.attributes[origin.attr] = Math.min(5, c.attributes[origin.attr] + 1);
 
-  c.trainedSkills = [origin.skill, cls.freeSkill].concat(d.trained);
-  c.trainedSkills = c.trainedSkills.filter(function (v, i, a) { return a.indexOf(v) === i; });
+  c.skills = {};
+  c.skills[origin.skill] = 5;
+  c.skills[cls.freeSkill] = 5;
+  Object.keys(d.skills).forEach(function (id) { c.skills[id] = 5; });
+  c.attributes[origin.attr] = Math.min(3, c.attributes[origin.attr] + 1);
   c.abilities = cls.abilities.map(function (a) { return Object.assign({}, a, { custom: false }); });
   var trilha = getTrilha(c.classId, d.trilha);
   if (trilha) {
@@ -419,21 +424,45 @@ function shiftResource(lbl, delta) {
   renderSheet();
 }
 
+function spendXp(c, amount) {
+  if (c.xp < amount) return false;
+  c.xp -= amount;
+  c.level = levelForXp(c.xp);
+  return true;
+}
+
 function changeAttr(attrId, delta) {
   var c = state.active;
-  var nv = clamp(c.attributes[attrId] + delta, 1, 5);
+  var old = c.attributes[attrId];
+  var nv = clamp(old + delta, 0, 3);
+  if (nv === old) return;
+  if (delta > 0) {
+    var cost = (nv * (nv + 1) - old * (old + 1)) / 2;
+    if (!spendXp(c, cost)) { toast('XP insuficiente para subir ' + attrId.toUpperCase() + ' (custo ' + cost + ').'); return; }
+    addLog(c, 'Atributo ' + attrId.toUpperCase() + ' subiu para ' + nv + ' (-' + cost + ' XP).');
+  } else {
+    addLog(c, 'Atributo ' + attrId.toUpperCase() + ' baixou para ' + nv + '.');
+  }
   c.attributes[attrId] = nv;
   var d = derive(c);
-  if (delta > 0) c.pv = Math.min(d.pvMax, c.pv + 10);
+  c.pv = Math.min(c.pv, d.pvMax);
+  c.san = Math.min(c.san, d.sanMax);
+  c.pe = Math.min(c.pe, d.peMax);
   saveState();
   renderSheet();
 }
 
-function toggleSkill(skillId) {
+function trainSkill(skillId) {
   var c = state.active;
-  var i = c.trainedSkills.indexOf(skillId);
-  if (i >= 0) c.trainedSkills.splice(i, 1);
-  else c.trainedSkills.push(skillId);
+  var L = c.skills[skillId] || 0;
+  var nexts = { 0: 5, 5: 10, 10: 15 };
+  var costMap = { 5: 2, 10: 4, 15: 6 };
+  if (!(L in nexts)) { toast('Perícia já está no nível máximo (Especialista).'); return; }
+  var nl = nexts[L];
+  var cost = costMap[nl];
+  if (!spendXp(c, cost)) { toast('XP insuficiente para treinar (' + cost + ' XP).'); return; }
+  c.skills[skillId] = nl;
+  addLog(c, 'Perícia ' + getSkill(skillId).name + ' subiu para ' + trainName(nl) + ' (-' + cost + ' XP).');
   saveState();
   renderSheet();
 }
@@ -444,7 +473,7 @@ function rollSkill(skillId) {
   var bonus = skillBonus(c, skillId);
   var d20 = rollD20();
   var total = d20 + bonus;
-  var trained = c.trainedSkills.indexOf(skillId) >= 0;
+  var trained = (c.skills[skillId] || 0) > 0;
   toast('Perícia ' + skill.name + ' — d20 [' + d20 + '] ' + fmtMod(bonus) + ' = ' + total +
     (trained ? ' (treinada)' : ''));
   addLog(c, 'Teste de ' + skill.name + ': d20 [' + d20 + '] ' + fmtMod(bonus) + ' = ' + total + (trained ? ' (treinada)' : ''));
@@ -589,6 +618,12 @@ function chosenWeapon() {
 function attackAction() {
   var c = state.active;
   var w = chosenWeapon();
+  if (w.mun) {
+    var ammo = ammoFor(c, w.id);
+    if (!ammo || ammo <= 0) { toast('Sem munição em ' + w.name + '. Recarregue!'); return; }
+    setAmmo(c, w.id, ammo - 1);
+    addLog(c, 'Disparou ' + w.name + ' — munição ' + (ammo - 1) + '/' + w.mun + '.');
+  }
   var res = rollAttack(c, w);
   state.combat.lastAttack = res;
   var info = res.info;
@@ -630,6 +665,56 @@ function damageAction() {
 function setBox(id, html) {
   var el = document.getElementById(id);
   if (el) el.innerHTML = html;
+}
+
+function reloadAmmo(weaponId) {
+  var c = state.active;
+  var w = getWeapon(weaponId) || equippedWeapon(c);
+  if (!w.mun) return;
+  setAmmo(c, w.id, w.mun);
+  addLog(c, 'Recarregou ' + w.name + ' (' + w.mun + ' munição).');
+  saveState();
+  renderSheet();
+}
+
+function enemyMentalAttack() {
+  var c = state.active;
+  var t = currentTarget();
+  if (!t) return;
+  if (!t.sanDmg) { toast('O alvo não causa dano mental.'); return; }
+  var dt = 10 + c.attributes.von;
+  var d20 = rollD20();
+  var hit = d20 + (t.atk || 0) >= dt;
+  var html = '<span>☠ ' + esc(t.name) + ' ataca a mente:</span><br>' +
+    'd20 [' + d20 + '] + ' + (t.atk || 0) + ' vs SAN DT ' + dt + ' → ' +
+    (hit ? '<span class="crit">AFETOU</span>' : '<span style="color:var(--red2)">Resistiu</span>');
+  if (hit) {
+    var dmg = rollDiceExpression(t.sanDmg).total;
+    c.san = Math.max(0, c.san - dmg);
+    html += '<br>Dano mental <strong>' + esc(t.sanDmg) + '</strong> = ' + dmg + ' → SAN ' + c.san + '/' + derive(c).sanMax;
+    addLog(c, '"' + t.name + '" causou ' + dmg + ' de dano mental (SAN). SAN: ' + c.san + '/' + derive(c).sanMax + '.');
+    if (c.san <= 0) { html += '<br><span class="crit">VOCÊ PERDEU A SANIDADE!</span>'; addLog(c, 'Sua SAN chegou a 0!'); }
+  } else {
+    addLog(c, 'Ameaça mental de "' + t.name + '" resistida (d20 [' + d20 + ']).');
+  }
+  saveState();
+  renderSheet();
+  setBox('enemy-result', html);
+}
+
+function castRitual(ritualId) {
+  var c = state.active;
+  var r = c.rituais.find(function (x) { return x.id === ritualId; });
+  if (!r) return;
+  var cost = r.pe;
+  var discount = c.elemento && r.elemento === c.elemento;
+  if (discount) cost = Math.max(1, cost - 1);
+  if (c.pe < cost) { toast('PE insuficiente! (' + c.pe + '/' + cost + ')'); return; }
+  c.pe -= cost;
+  addLog(c, 'Conjurou "' + r.nome + '" (' + cost + ' PE' + (discount ? ', afinidade' : '') + ').');
+  toast('Ritual "' + r.nome + '" conjurado (-' + cost + ' PE).');
+  saveState();
+  renderSheet();
 }
 
 function addTarget() {

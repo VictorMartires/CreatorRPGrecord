@@ -43,13 +43,22 @@ function loadCharacters() {
     if (!c.owner) c.owner = { id: 'legado', name: 'Não definido' };
     if (!Array.isArray(c.abilities)) c.abilities = [];
     if (!Array.isArray(c.items)) c.items = [];
-    if (!Array.isArray(c.trainedSkills)) c.trainedSkills = [];
     if (!Array.isArray(c.log)) c.log = [];
     if (!Array.isArray(c.rituais)) c.rituais = [];
+    if (!c.skills) {
+      c.skills = {};
+      (c.trainedSkills || []).forEach(function (id) { c.skills[id] = 5; });
+    }
+    delete c.trainedSkills;
     if (!c.municao) c.municao = {};
     if (!c.equipment) c.equipment = { weaponMain: 'desarmado', weaponOff: null, armor: 'nenhuma', accessory: null };
     if (c.trilha == null) c.trilha = null;
     if (c.elemento == null) c.elemento = null;
+    c.attributes = c.attributes || {};
+    ATTRIBUTES.forEach(function (a) {
+      var v = c.attributes[a.id];
+      c.attributes[a.id] = Math.max(0, Math.min(3, Number.isFinite(v) ? v : 0));
+    });
     return c;
   });
 }

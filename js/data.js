@@ -10,24 +10,46 @@ const ATTRIBUTES = [
 ];
 
 const SKILLS = [
+  { id: 'acrobacia', name: 'Acrobacia', attr: 'agi' },
+  { id: 'adestramento', name: 'Adestramento', attr: 'pre' },
+  { id: 'artes', name: 'Artes', attr: 'pre' },
   { id: 'atletismo', name: 'Atletismo', attr: 'for' },
-  { id: 'luta', name: 'Luta', attr: 'for' },
-  { id: 'pontaria', name: 'Pontaria', attr: 'agi' },
-  { id: 'reflexos', name: 'Reflexos', attr: 'agi' },
+  { id: 'atualidades', name: 'Atualidades', attr: 'int' },
+  { id: 'ciencia', name: 'Ciência', attr: 'int' },
   { id: 'crime', name: 'Crime', attr: 'agi' },
-  { id: 'furtividade', name: 'Furtividade', attr: 'agi' },
-  { id: 'intimidar', name: 'Intimidar', attr: 'pre' },
   { id: 'diplomacia', name: 'Diplomacia', attr: 'pre' },
   { id: 'enganação', name: 'Enganação', attr: 'pre' },
+  { id: 'fortitude', name: 'Fortitude', attr: 'vig' },
+  { id: 'furtividade', name: 'Furtividade', attr: 'agi' },
+  { id: 'intimidacao', name: 'Intimidação', attr: 'pre' },
   { id: 'investigação', name: 'Investigação', attr: 'int' },
-  { id: 'ocultismo', name: 'Ocultismo', attr: 'int' },
-  { id: 'ofício', name: 'Ofício', attr: 'int' },
-  { id: 'tecnologia', name: 'Tecnologia', attr: 'int' },
+  { id: 'luta', name: 'Luta', attr: 'for' },
   { id: 'medicina', name: 'Medicina', attr: 'int' },
-  { id: 'percepção', name: 'Percepção', attr: 'int' },
-  { id: 'sobrevivência', name: 'Sobrevivência', attr: 'vig' },
+  { id: 'ocultismo', name: 'Ocultismo', attr: 'int' },
+  { id: 'oficio', name: 'Ofício', attr: 'int' },
+  { id: 'percepcao', name: 'Percepção', attr: 'int' },
+  { id: 'pilotagem', name: 'Pilotagem', attr: 'agi' },
+  { id: 'pontaria', name: 'Pontaria', attr: 'agi' },
+  { id: 'profissao', name: 'Profissão', attr: 'int' },
+  { id: 'reflexos', name: 'Reflexos', attr: 'agi' },
+  { id: 'religiao', name: 'Religião', attr: 'int' },
+  { id: 'sobrevivencia', name: 'Sobrevivência', attr: 'vig' },
+  { id: 'tatica', name: 'Tática', attr: 'int' },
+  { id: 'tecnologia', name: 'Tecnologia', attr: 'int' },
   { id: 'vontade', name: 'Vontade', attr: 'von' }
 ];
+
+const TRAIN_LEVELS = [
+  { level: 0, name: 'Destreinado' },
+  { level: 5, name: 'Treinado' },
+  { level: 10, name: 'Veterano' },
+  { level: 15, name: 'Especialista' }
+];
+
+function trainName(level) {
+  var found = TRAIN_LEVELS.find(function (t) { return t.level === level; });
+  return found ? found.name : 'Destreinado';
+}
 
 const ORIGINS = [
   { id: 'academico', name: 'Acadêmico', attr: 'int', skill: 'investigação', desc: '+1 Intelecto; Perícia Investigação treinada.' },
@@ -46,9 +68,9 @@ const CLASSES = {
   combatente: {
     id: 'combatente',
     name: 'Combatente',
-    pvBase: 25,
+    pvBase: 20,
     sanBase: 15,
-    peBase: 3,
+    peBase: 2,
     trainings: 3,
     freeSkill: 'luta',
     desc: 'Mestre das armas e do combate. Forte em Força, Agilidade e Vigor.',
@@ -62,9 +84,9 @@ const CLASSES = {
   especialista: {
     id: 'especialista',
     name: 'Especialista',
-    pvBase: 20,
-    sanBase: 15,
-    peBase: 4,
+    pvBase: 16,
+    sanBase: 18,
+    peBase: 3,
     trainings: 4,
     freeSkill: 'reflexos',
     desc: 'Agente tático e versátil. Forte em Agilidade, Intelecto e Presença.',
@@ -78,8 +100,8 @@ const CLASSES = {
   ocultista: {
     id: 'ocultista',
     name: 'Ocultista',
-    pvBase: 15,
-    sanBase: 20,
+    pvBase: 12,
+    sanBase: 25,
     peBase: 3,
     trainings: 2,
     freeSkill: 'ocultismo',
@@ -197,7 +219,7 @@ const DEFAULT_ENEMIES = [
   { id: 'estrangerio', name: 'Estrangeiro (Mi-go)', level: 18, pv: 150, defesa: 19, prevencao: 3, atk: 12, damage: '3d8+4', xp: 4200, sanDmg: '3d6', notes: 'Criatura de Conhecimento.' }
 ];
 
-const XPS_PER_LEVEL = 50;
+const XPS_PER_LEVEL = 25;
 
 function xpToReachLevel(level) {
   return XPS_PER_LEVEL * (level - 1) * level / 2;
